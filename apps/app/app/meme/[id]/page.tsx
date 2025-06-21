@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, CandlestickSeries, ColorType, CrosshairMode } from 'lightweight-charts';
+import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
 import { 
   Bell, 
   ChevronDown, 
@@ -52,7 +52,7 @@ export default function TradingPage() {
       },
     });
 
-    const candlestickSeries = chart.addSeries(CandlestickSeries, {
+    const candlestickSeries = chart.addCandlestickSeries({
       upColor: '#22C55E',
       downColor: '#EF4444',
       borderVisible: false,
