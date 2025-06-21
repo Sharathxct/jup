@@ -11,13 +11,41 @@ import {
   Maximize2, 
   Settings, 
   Share2, 
-  Star 
+  Star,
+  Search,
+  X
 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export default function TradingPage() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const [amount, setAmount] = useState('0.0');
-  const [selectedTab, setSelectedTab] = useState('Market');
+  const [amount, setAmount] = useState('0.00');
+  const [selectedTab, setSelectedTab] = useState<'buy' | 'sell'>('buy');
+  const [showSlippagePopup, setShowSlippagePopup] = useState(false);
+  const [maxSlippage, setMaxSlippage] = useState('2');
+  const [tipAmount, setTipAmount] = useState('0.003');
+  const [frontRunProtection, setFrontRunProtection] = useState(false);
+  const pathname = usePathname();
+
+  const handleTabChange = (tab: 'buy' | 'sell') => {
+    setSelectedTab(tab);
+    setAmount('0.00');
+  };
+
+  const handleQuickAmountClick = (value: string) => {
+    if (selectedTab === 'buy') {
+      if (value === 'max') {
+        // TODO: Calculate max based on wallet balance
+        setAmount('1.00');
+      } else {
+        setAmount(value);
+      }
+    } else {
+      // For sell mode, handle percentages
+      setAmount(value.replace('%', ''));
+    }
+  };
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -63,7 +91,6 @@ export default function TradingPage() {
     const data = [
       { time: '2024-01-01', open: 6500, high: 6850, low: 6400, close: 6800 },
       { time: '2024-01-02', open: 6800, high: 7100, low: 6700, close: 6950 },
-      // Add more data points...
     ];
 
     candlestickSeries.setData(data);
@@ -75,15 +102,57 @@ export default function TradingPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-[#0A0A0A] text-white">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[#1F2937]">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="Token" className="w-8 h-8" />
-            <div>
-              <h1 className="text-lg font-semibold">PEPE</h1>
-              <p className="text-sm text-gray-400">$0.00000123</p>
+    <div className="min-h-screen bg-black">
+      {/* Navigation */}
+      <nav className="bg-[#111827]/50 border-b border-[#1F2937] px-6 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 flex items-center justify-center">
+                <svg width="32" height="32" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M122.363 90.3495C117.674 95.9288 117.674 104.071 122.363 109.65L160.767 155.349C168.968 165.108 162.031 180 149.284 180H51.0288C38.2821 180 31.3446 165.108 39.5454 155.349L77.9499 109.65C82.6386 104.071 82.6386 95.9288 77.9498 90.3495L39.5453 44.6504C31.3446 34.8921 38.2821 20 51.0288 20L149.284 20C162.03 20 168.968 34.8921 160.767 44.6504L122.363 90.3495Z" fill="url(#paint0_linear_105_736)"/>
+                  <defs>
+                    <linearGradient id="paint0_linear_105_736" x1="149.557" y1="20" x2="39.7213" y2="117.692" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#B0B9FF"/>
+                      <stop offset="1" stopColor="#E7E9FF"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <span className="text-white font-medium">Blaze</span>
+            </div>
+            
+            <div className="flex items-center gap-6">
+              <Link href="/pulse" className={`${pathname === '/pulse' ? 'text-blue-400' : 'text-gray-400'}`}>Pulse</Link>
+              <Link href="/portfolio" className={`${pathname === '/portfolio' ? 'text-blue-400' : 'text-gray-400'}`}>Portfolio</Link>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <Search className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" />
+            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5">
+              connect
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="flex flex-col h-[calc(100vh-64px)]">
+        {/* Token Metadata Line */}
+        <div className="flex items-center justify-between px-6 py-3 bg-[#111827] border-b border-[#1F2937]">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <img src="/logo.svg" alt="Token" className="w-6 h-6" />
+              <span className="text-white font-medium">764</span>
+              <span className="text-gray-400">Roblo.x T...</span>
+            </div>
+            <div className="text-gray-400">|</div>
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-gray-400">Price: <span className="text-white">$6.51K</span></span>
+              <span className="text-gray-400">Liquidity: <span className="text-white">$10.9K</span></span>
+              <span className="text-gray-400">Supply: <span className="text-white">1B</span></span>
+              <span className="text-gray-400">Global Fees Paid: <span className="text-white">1.221</span></span>
+              <span className="text-gray-400">B.Curve: <span className="text-green-400">29.94%</span></span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -93,87 +162,197 @@ export default function TradingPage() {
             <ExternalLink className="w-5 h-5 text-gray-400" />
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-400">24h Volume:</span>
-            <span>$1.2M</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-400">Market Cap:</span>
-            <span>$420M</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-gray-400" />
-            <Settings className="w-5 h-5 text-gray-400" />
-            <LayoutGrid className="w-5 h-5 text-gray-400" />
-            <Maximize2 className="w-5 h-5 text-gray-400" />
-          </div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex flex-1">
-        {/* Chart */}
-        <div className="flex-1" ref={chartContainerRef} />
+        {/* Main Content */}
+        <div className="flex flex-1 relative">
+          {/* Chart */}
+          <div className="flex-1 h-full" ref={chartContainerRef} />
 
-        {/* Trading Panel */}
-        <div className="w-80 border-l border-[#1F2937] p-4">
-          <div className="flex gap-2 mb-4">
-            <button 
-              className={`flex-1 py-2 rounded ${selectedTab === 'Market' ? 'bg-[#1F2937] text-white' : 'text-gray-400'}`}
-              onClick={() => setSelectedTab('Market')}
-            >
-              Market
-            </button>
-            <button 
-              className={`flex-1 py-2 rounded ${selectedTab === 'Limit' ? 'bg-[#1F2937] text-white' : 'text-gray-400'}`}
-              onClick={() => setSelectedTab('Limit')}
-            >
-              Limit
-            </button>
-            <button 
-              className={`flex-1 py-2 rounded ${selectedTab === 'Advanced' ? 'bg-[#1F2937] text-white' : 'text-gray-400'}`}
-              onClick={() => setSelectedTab('Advanced')}
-            >
-              Advanced
-            </button>
-          </div>
+          {/* Trading Panel */}
+          <div className="w-80 bg-[#1A1F2B] h-full">
+            <div className="flex flex-col gap-4 p-4">
+              {/* Buy/Sell Tabs */}
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={() => handleTabChange('buy')}
+                  className={`py-3 rounded font-medium transition-colors ${
+                    selectedTab === 'buy' 
+                      ? 'bg-[#22C55E] text-white' 
+                      : 'bg-[#1F2937] text-gray-400'
+                  }`}
+                >
+                  buy
+                </button>
+                <button 
+                  onClick={() => handleTabChange('sell')}
+                  className={`py-3 rounded font-medium transition-colors ${
+                    selectedTab === 'sell' 
+                      ? 'bg-[#F87171] text-white' 
+                      : 'bg-[#1F2937] text-gray-400'
+                  }`}
+                >
+                  sell
+                </button>
+              </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-gray-400">Amount</label>
-              <div className="flex items-center gap-2 mt-1">
+              {/* Set Max Slippage Button */}
+              <div className="flex justify-end">
+                <button 
+                  onClick={() => setShowSlippagePopup(true)}
+                  className="bg-[#1F2937] text-gray-400 py-2 px-4 rounded text-sm"
+                >
+                  set max slippage
+                </button>
+              </div>
+
+              {/* Amount Input */}
+              <div className="relative">
                 <input
                   type="text"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full bg-[#1F2937] rounded px-3 py-2 text-white"
+                  className="w-full bg-[#1F2937] text-white py-3 px-4 rounded"
+                  placeholder="0.00"
                 />
-                <button className="bg-[#1F2937] px-3 py-2 rounded text-gray-400">
-                  <ChevronDown className="w-4 h-4" />
-                </button>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  <span className="text-white">Sol</span>
+                  <img src="/solana.svg" alt="SOL" className="w-5 h-5" />
+                </div>
               </div>
-            </div>
 
-            <button className="w-full bg-[#22C55E] text-white py-3 rounded font-medium">
-              Buy PEPE
-            </button>
+              {/* Quick Amount Buttons */}
+              {selectedTab === 'buy' ? (
+                <div className="grid grid-cols-6 gap-2">
+                  <button 
+                    onClick={() => handleQuickAmountClick('0')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    0
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('0.1')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    0.1
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('0.3')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    0.3
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('0.5')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    0.5
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('1')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    1
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('max')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    max
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-6 gap-2">
+                  <button 
+                    onClick={() => handleQuickAmountClick('0%')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    0%
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('10%')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    10%
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('20%')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    20%
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('30%')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    30%
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('50%')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    50%
+                  </button>
+                  <button 
+                    onClick={() => handleQuickAmountClick('100%')}
+                    className="bg-[#1F2937] text-gray-400 py-2 rounded text-sm hover:bg-[#374151]"
+                  >
+                    100%
+                  </button>
+                </div>
+              )}
 
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Price Impact</span>
-                <span className="text-[#22C55E]">0.12%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Max Slippage</span>
-                <span>1.00%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Network Fee</span>
-                <span>~$2.50</span>
-              </div>
+              {/* Action Button */}
+              <button 
+                className={`w-full text-white py-3 rounded font-medium ${
+                  selectedTab === 'buy' 
+                    ? 'bg-[#22C55E] hover:bg-[#1B9D4D]' 
+                    : 'bg-[#F87171] hover:bg-[#EF4444]'
+                }`}
+              >
+                {`${selectedTab} 764`}
+              </button>
             </div>
           </div>
+
+          {/* Max Slippage Popup */}
+          {showSlippagePopup && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-[#1A1F2B] rounded-lg p-6 w-96">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-white text-lg font-medium">Set Max Slippage</h3>
+                  <button 
+                    onClick={() => setShowSlippagePopup(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-gray-400 text-sm block mb-2">Maximum slippage (%)</label>
+                    <input
+                      type="text"
+                      value={maxSlippage}
+                      onChange={(e) => setMaxSlippage(e.target.value)}
+                      className="w-full bg-[#1F2937] text-white py-2 px-3 rounded"
+                      placeholder="Enter percentage"
+                    />
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    This is the maximum amount of slippage you are willing to accept when placing trades.
+                  </p>
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={() => setShowSlippagePopup(false)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded"
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
