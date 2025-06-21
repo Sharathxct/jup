@@ -207,6 +207,23 @@ const coinData = {
   ]
 };
 
+interface Coin {
+  id: number;
+  name: string;
+  symbol: string;
+  icon: string;
+  price: string;
+  change: string;
+  changePercent: number;
+  marketCap: string;
+  volume: string;
+  age: string;
+  holders: number;
+  txns: number;
+  chart: string;
+  tags: string[];
+}
+
 interface FilterPopupProps {
   isOpen: boolean;
   onClose: () => void;
@@ -344,7 +361,7 @@ function FilterPopup({ isOpen, onClose }: FilterPopupProps) {
   );
 }
 
-function CoinCard({ coin }: { coin: any }) {
+function CoinCard({ coin }: { coin: Coin }) {
   const isPositive = coin.changePercent > 0;
   
   return (
@@ -394,7 +411,7 @@ function CoinCard({ coin }: { coin: any }) {
   );
 }
 
-function CoinSection({ title, coins, icon }: { title: string; coins: any[]; icon?: string }) {
+function CoinSection({ title, coins }: { title: string; coins: Coin[]; icon?: string }) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   return (
@@ -461,7 +478,7 @@ export default function PulsePage() {
           <div className="flex items-center gap-4">
             <Search className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" />
             <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5">
-              Deposit
+              connect
             </button>
           </div>
         </div>

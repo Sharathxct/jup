@@ -7,7 +7,6 @@ import {
   ChevronDown, 
   Copy, 
   ExternalLink, 
-  Info, 
   LayoutGrid, 
   Maximize2, 
   Settings, 
@@ -15,7 +14,7 @@ import {
   Star 
 } from 'lucide-react';
 
-export default function TradingPage({ params }: { params: { id: string } }) {
+export default function TradingPage() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [amount, setAmount] = useState('0.0');
   const [selectedTab, setSelectedTab] = useState('Market');
