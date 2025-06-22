@@ -1,11 +1,12 @@
 'use client';
 
-import { Search, Star, Bell, Settings, ChevronDown, TrendingUp, TrendingDown, RotateCcw, Info} from 'lucide-react';
-import { useState } from 'react';
+import { Bell, Settings, ChevronDown, TrendingUp, TrendingDown, RotateCcw, Info, Star} from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useNewTokensWebSocket, useEnhancedToken } from '@/services/pulse/query';
+import type { ProcessedToken } from '@/services/pulse/api';
+import { useState } from 'react';
 
-// Mock data for coins
+// Mock data for coins (keeping for Final Stretch and Migrated sections)
 const coinData = {
   newPairs: [
     {
@@ -208,7 +209,7 @@ const coinData = {
 };
 
 interface Coin {
-  id: number;
+  id: number | string;
   name: string;
   symbol: string;
   icon: string;
@@ -411,17 +412,111 @@ function CoinCard({ coin }: { coin: Coin }) {
   );
 }
 
-function CoinSection({ title, coins }: { title: string; coins: Coin[]; icon?: string }) {
+// Enhanced coin card component for real-time tokens
+function EnhancedCoinCard({ token }: { token: ProcessedToken }) {
+  const enhancedToken = useEnhancedToken(token);
+  const isPositive = enhancedToken.changePercent > 0;
+  
+  return (
+    <Link href={`/meme/${enhancedToken.id}`}>
+    <div className="bg-[#1A1F2B] p-4 hover:bg-[#1E2433] transition-colors">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#1F2937] flex items-center justify-center text-xl relative">
+            {enhancedToken.isLoadingMetadata ? (
+              <div className="animate-pulse bg-gray-600 w-6 h-6 rounded"></div>
+            ) : (
+              enhancedToken.metadata?.image ? (
+                <img 
+                  src={enhancedToken.metadata.image} 
+                  alt={enhancedToken.name}
+                  className="w-8 h-8 rounded object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).parentElement!.innerHTML = enhancedToken.icon;
+                  }}
+                />
+              ) : enhancedToken.icon
+            )}
+          </div>
+          <div>
+            <div className="font-medium text-white">
+              {enhancedToken.isLoadingMetadata ? (
+                <div className="animate-pulse bg-gray-600 h-4 w-20 rounded"></div>
+              ) : (
+                enhancedToken.name
+              )}
+            </div>
+            <div className="text-sm text-gray-400">
+              {enhancedToken.isLoadingMetadata ? (
+                <div className="animate-pulse bg-gray-600 h-3 w-12 rounded mt-1"></div>
+              ) : (
+                enhancedToken.symbol
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-lg font-medium text-[#60A5FA]">{enhancedToken.price}</div>
+          <div className="text-sm text-gray-300">{enhancedToken.change}</div>
+        </div>
+      </div>
+      
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs bg-[#1F2937] px-2 py-0.5 text-gray-300">{enhancedToken.age}</span>
+          <span className="text-xs text-gray-400">👥 {enhancedToken.holders}</span>
+          <span className="text-xs text-gray-400">📊 {enhancedToken.txns}</span>
+        </div>
+        <div className={`flex items-center gap-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+          {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+          <span className="text-sm">{Math.abs(enhancedToken.changePercent)}%</span>
+        </div>
+      </div>
+      
+      <div className="flex gap-1.5 flex-wrap">
+        {enhancedToken.tags.map((tag: string, index: number) => (
+          <span key={index} className={`text-xs px-2 py-0.5 ${
+            tag === 'Paid' ? 'bg-green-600/20 text-green-400' : 
+            tag === 'DS' ? 'bg-blue-600/20 text-blue-400' : 
+            'bg-[#1F2937] text-gray-300'
+          }`}>
+            {tag}
+          </span>
+        ))}
+      </div>
+    </div>
+    </Link>
+  );
+}
+
+function CoinSection({ title, coins, realTimeTokens }: { 
+  title: string; 
+  coins?: Coin[]; 
+  realTimeTokens?: ProcessedToken[];
+  icon?: string;
+}) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const isNewPairs = title === "New Pairs";
+  const displayCoins = isNewPairs ? [] : (coins || []);
+  const displayTokens = isNewPairs ? (realTimeTokens || []) : [];
 
   return (
     <div className="bg-[#111827] flex flex-col h-[calc(100vh-13rem)]">
       <div className="flex items-center justify-between mb-4 px-4 pt-4">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-medium text-white">{title}</h2>
+          {isNewPairs && (
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-green-400">Live</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
-          <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1">⚡ 0</button>
+          <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1">
+            ⚡ {displayTokens.length || displayCoins.length}
+          </button>
           <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1">≡</button>
           <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-blue-400 px-2 py-1">P1</button>
           <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1">P2</button>
@@ -437,9 +532,24 @@ function CoinSection({ title, coins }: { title: string; coins: Coin[]; icon?: st
         </div>
       </div>
       <div className="space-y-px overflow-y-auto flex-1">
-        {coins.map((coin) => (
-          <CoinCard key={coin.id} coin={coin} />
-        ))}
+        {isNewPairs ? (
+          displayTokens.length > 0 ? (
+            displayTokens.map((token) => (
+              <EnhancedCoinCard key={token.id} token={token} />
+            ))
+          ) : (
+            <div className="flex items-center justify-center h-32 text-gray-400">
+              <div className="text-center">
+                <div className="animate-pulse mb-2">🔄</div>
+                <div>Waiting for new tokens...</div>
+              </div>
+            </div>
+          )
+        ) : (
+          displayCoins.map((coin) => (
+            <CoinCard key={coin.id} coin={coin} />
+          ))
+        )}
       </div>
       <FilterPopup isOpen={isFilterOpen} onClose={() => setIsFilterOpen(false)} />
     </div>
@@ -447,13 +557,23 @@ function CoinSection({ title, coins }: { title: string; coins: Coin[]; icon?: st
 }
 
 export default function PulsePage() {
+  const { tokens: newTokens, isLoading, isConnected } = useNewTokensWebSocket();
+
   return (
     <div className=" bg-black">
       {/* Main Content */}
       <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-medium text-white">Pulse</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-medium text-white">Pulse</h1>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className={`text-xs ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-white px-3 py-1.5 flex items-center gap-2">
               <span>Display</span>
@@ -469,7 +589,7 @@ export default function PulsePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 px-2">
           <CoinSection 
             title="New Pairs" 
-            coins={coinData.newPairs}
+            realTimeTokens={newTokens}
           />
           <CoinSection 
             title="Final Stretch" 
