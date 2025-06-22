@@ -1,7 +1,6 @@
 'use client';
 
 import { WalletProvider } from "@/components/WalletProvider";
-import { Header } from "@/components/Header";
 
 export function ClientLayout({
   children,
@@ -10,7 +9,6 @@ export function ClientLayout({
 }>) {
   return (
     <WalletProvider>
-      <Header />
       {children}
     </WalletProvider>
   );

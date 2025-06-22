@@ -315,10 +315,6 @@ function CoinSection({ title, coins, realTimeTokens }: {
           <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1">
             ⚡ {displayTokens.length || displayCoins.length}
           </button>
-          <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1">≡</button>
-          <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-blue-400 px-2 py-1">P1</button>
-          <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1">P2</button>
-          <button className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1">P3</button>
           <button 
             className="bg-[#1A1F2B] hover:bg-[#1E2433] text-gray-400 hover:text-gray-300 px-2 py-1 ml-1"
             onClick={() => setIsFilterOpen(true)}
