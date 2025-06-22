@@ -2,211 +2,9 @@
 
 import { Bell, Settings, ChevronDown, TrendingUp, TrendingDown, RotateCcw, Info, Star} from 'lucide-react';
 import Link from 'next/link';
-import { useNewTokensWebSocket, useEnhancedToken } from '@/services/pulse/query';
+import { usePulseWebSocket, useEnhancedToken } from '@/services/pulse/query';
 import type { ProcessedToken } from '@/services/pulse/api';
 import { useState } from 'react';
-
-// Mock data for coins (keeping for Final Stretch and Migrated sections)
-const coinData = {
-  newPairs: [
-    {
-      id: 1,
-      name: 'jewGPT',
-      symbol: 'jewGPT',
-      icon: '🔷',
-      price: '$14K',
-      change: '$13K',
-      changePercent: 27,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '43s',
-      holders: 53,
-      txns: 19,
-      chart: 'trending_up',
-      tags: ['DS', '0%', '0%', '11%']
-    },
-    {
-      id: 2,
-      name: 'garbo coin',
-      symbol: 'garbo coin',
-      icon: '🗑️',
-      price: '$5K',
-      change: '$11K',
-      changePercent: 13,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '1m',
-      holders: 16,
-      txns: 186,
-      chart: 'trending_down',
-      tags: ['DS', '0%', '0%', '0%']
-    },
-    {
-      id: 3,
-      name: 'Meme-ify',
-      symbol: 'New "Meme-ification"',
-      icon: '👩',
-      price: '$5K',
-      change: '$15K',
-      changePercent: 7,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '3m',
-      holders: 9,
-      txns: 2,
-      chart: 'trending_down',
-      tags: ['0%', '0%', '0%', '0%']
-    },
-    {
-        id: 4,
-        name: 'Safe Coin',
-        symbol: 'Safe Coin',
-        icon: '🪙',
-        price: '$52K',
-        change: '$125K',
-        changePercent: 25,
-        marketCap: 'MC',
-        volume: 'v',
-        age: '55m',
-        holders: 313,
-        txns: 140,
-        chart: 'trending_up',
-        tags: ['DS', '0%', '0%', '5%', 'Paid']
-      },
-      {
-        id: 5,
-        name: 'WMT',
-        symbol: 'Woke Mind Theory',
-        icon: '🧠',
-        price: '$8K',
-        change: '$11K',
-        changePercent: 23,
-        marketCap: 'MC',
-        volume: 'v',
-        age: '3m',
-        holders: 24,
-        txns: 18,
-        chart: 'trending_down',
-        tags: ['DS', '5%', '0%', '5%']
-      },
-      {
-        id: 6,
-        name: 'Zelda',
-        symbol: 'The Farting Pig',
-        icon: '🐷',
-        price: '$4K',
-        change: '$22K',
-        changePercent: -5,
-        marketCap: 'MC',
-        volume: 'v',
-        age: '3m',
-        holders: 11,
-        txns: 5,
-        chart: 'trending_down',
-        tags: []
-      }
-  ],
-  finalStretch: [
-    {
-      id: 4,
-      name: 'Safe Coin',
-      symbol: 'Safe Coin',
-      icon: '🪙',
-      price: '$52K',
-      change: '$125K',
-      changePercent: 25,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '55m',
-      holders: 313,
-      txns: 140,
-      chart: 'trending_up',
-      tags: ['DS', '0%', '0%', '5%', 'Paid']
-    },
-    {
-      id: 5,
-      name: 'WMT',
-      symbol: 'Woke Mind Theory',
-      icon: '🧠',
-      price: '$8K',
-      change: '$11K',
-      changePercent: 23,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '3m',
-      holders: 24,
-      txns: 18,
-      chart: 'trending_down',
-      tags: ['DS', '5%', '0%', '5%']
-    },
-    {
-      id: 6,
-      name: 'Zelda',
-      symbol: 'The Farting Pig',
-      icon: '🐷',
-      price: '$4K',
-      change: '$22K',
-      changePercent: -5,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '3m',
-      holders: 11,
-      txns: 5,
-      chart: 'trending_down',
-      tags: []
-    }
-  ],
-  migrated: [
-    {
-      id: 7,
-      name: 'BENNY',
-      symbol: 'BENNY',
-      icon: '🐕',
-      price: '$85K',
-      change: '$103K',
-      changePercent: 24,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '34s',
-      holders: 145,
-      txns: 94,
-      chart: 'trending_up',
-      tags: ['DS', '0%', '0%', '0%']
-    },
-    {
-      id: 8,
-      name: 'Legoganda',
-      symbol: 'LEGO Propaganda',
-      icon: '🏆',
-      price: '$78K',
-      change: '$240K',
-      changePercent: 19,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '13m',
-      holders: 621,
-      txns: 287,
-      chart: 'trending_up',
-      tags: ['DS', '0%', '2%', '4%', 'Paid']
-    },
-    {
-      id: 9,
-      name: '$USA',
-      symbol: 'American Coin',
-      icon: '🇺🇸',
-      price: '$91',
-      change: '$2K',
-      changePercent: 8,
-      marketCap: 'MC',
-      volume: 'v',
-      age: '16m',
-      holders: 4,
-      txns: 0,
-      chart: 'stable',
-      tags: ['0%', '4%', '0%', '0%']
-    }
-  ]
-};
 
 interface Coin {
   id: number | string;
@@ -497,16 +295,16 @@ function CoinSection({ title, coins, realTimeTokens }: {
   icon?: string;
 }) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const isNewPairs = title === "New Pairs";
-  const displayCoins = isNewPairs ? [] : (coins || []);
-  const displayTokens = isNewPairs ? (realTimeTokens || []) : [];
+  const isRealTime = title === "New Pairs" || title === "Final Stretch" || title === "Migrated";
+  const displayCoins = isRealTime ? [] : (coins || []);
+  const displayTokens = isRealTime ? (realTimeTokens || []) : [];
 
   return (
     <div className="bg-[#111827] flex flex-col h-[calc(100vh-13rem)]">
       <div className="flex items-center justify-between mb-4 px-4 pt-4">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-medium text-white">{title}</h2>
-          {isNewPairs && (
+          {isRealTime && (
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-xs text-green-400">Live</span>
@@ -532,7 +330,7 @@ function CoinSection({ title, coins, realTimeTokens }: {
         </div>
       </div>
       <div className="space-y-px overflow-y-auto flex-1">
-        {isNewPairs ? (
+        {isRealTime ? (
           displayTokens.length > 0 ? (
             displayTokens.map((token) => (
               <EnhancedCoinCard key={token.id} token={token} />
@@ -541,7 +339,7 @@ function CoinSection({ title, coins, realTimeTokens }: {
             <div className="flex items-center justify-center h-32 text-gray-400">
               <div className="text-center">
                 <div className="animate-pulse mb-2">🔄</div>
-                <div>Waiting for new tokens...</div>
+                <div>Waiting for {title.toLowerCase()}...</div>
               </div>
             </div>
           )
@@ -557,7 +355,7 @@ function CoinSection({ title, coins, realTimeTokens }: {
 }
 
 export default function PulsePage() {
-  const { tokens: newTokens, isLoading, isConnected } = useNewTokensWebSocket();
+  const { newTokens, finalStretchTokens, migratedTokens, isLoading, isConnected } = usePulseWebSocket();
 
   return (
     <div className=" bg-black">
@@ -593,11 +391,11 @@ export default function PulsePage() {
           />
           <CoinSection 
             title="Final Stretch" 
-            coins={coinData.finalStretch}
+            realTimeTokens={finalStretchTokens}
           />
           <CoinSection 
             title="Migrated" 
-            coins={coinData.migrated}
+            realTimeTokens={migratedTokens}
           />
         </div>
       </div>

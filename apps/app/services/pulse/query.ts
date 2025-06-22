@@ -8,43 +8,90 @@ import {
   TokenMetadata, 
   BitqueryResponse, 
   processTokenData,
+  processFinalStretchData,
+  processMigratedData,
   fetchTokenMetadata 
 } from './api';
 
 // Query keys
 export const pulseQueryKeys = {
   newTokens: ['pulse', 'newTokens'] as const,
+  finalStretchTokens: ['pulse', 'finalStretchTokens'] as const,
+  migratedTokens: ['pulse', 'migratedTokens'] as const,
   tokenMetadata: (uri: string) => ['pulse', 'tokenMetadata', uri] as const,
 };
 
 // Hook for managing WebSocket connection and real-time data
-export function useNewTokensWebSocket() {
+export function usePulseWebSocket() {
   const queryClient = useQueryClient();
   const wsManagerRef = useRef<PulseWebSocketManager | null>(null);
 
-  // Query to store the tokens data
-  const { data: tokens = [], isLoading } = useQuery({
+  // Queries to store the different token types
+  const { data: newTokens = [], isLoading: isLoadingNew } = useQuery({
     queryKey: pulseQueryKeys.newTokens,
     queryFn: () => Promise.resolve([] as ProcessedToken[]),
-    staleTime: Infinity, // Data is always fresh from WebSocket
+    staleTime: Infinity,
+  });
+
+  const { data: finalStretchTokens = [], isLoading: isLoadingFinal } = useQuery({
+    queryKey: pulseQueryKeys.finalStretchTokens,
+    queryFn: () => Promise.resolve([] as ProcessedToken[]),
+    staleTime: Infinity,
+  });
+
+  const { data: migratedTokens = [], isLoading: isLoadingMigrated } = useQuery({
+    queryKey: pulseQueryKeys.migratedTokens,
+    queryFn: () => Promise.resolve([] as ProcessedToken[]),
+    staleTime: Infinity,
   });
 
   useEffect(() => {
-    // Initialize WebSocket connection
-    wsManagerRef.current = new PulseWebSocketManager();
+    // Use singleton instance to prevent multiple connections
+    wsManagerRef.current = PulseWebSocketManager.getInstance();
     
     const handleNewData = (data: BitqueryResponse) => {
+      // Handle new tokens
       if (data.Solana?.TokenSupplyUpdates?.length > 0) {
-        const newTokens = data.Solana.TokenSupplyUpdates.map(processTokenData);
+        const newTokensData = data.Solana.TokenSupplyUpdates.map(processTokenData);
         
-        // Update the query data by prepending new tokens (most recent first)
         queryClient.setQueryData(pulseQueryKeys.newTokens, (oldTokens: ProcessedToken[] = []) => {
           const existingMintAddresses = new Set(oldTokens.map(token => token.mintAddress));
-          const uniqueNewTokens = newTokens.filter(token => !existingMintAddresses.has(token.mintAddress));
+          const uniqueNewTokens = newTokensData.filter(token => !existingMintAddresses.has(token.mintAddress));
           
-          // Keep only the last 100 tokens to prevent memory issues
           return [...uniqueNewTokens, ...oldTokens].slice(0, 100);
         });
+      }
+
+      // Handle final stretch tokens
+      if (data.Solana?.DEXPools && data.Solana.DEXPools.length > 0) {
+        const finalStretchData = data.Solana.DEXPools
+          .map(processFinalStretchData)
+          .filter((token): token is ProcessedToken => token !== null); // Filter out non-pump tokens
+        
+        if (finalStretchData.length > 0) {
+          queryClient.setQueryData(pulseQueryKeys.finalStretchTokens, (oldTokens: ProcessedToken[] = []) => {
+            const existingMintAddresses = new Set(oldTokens.map(token => token.mintAddress));
+            const uniqueNewTokens = finalStretchData.filter(token => !existingMintAddresses.has(token.mintAddress));
+            
+            return [...uniqueNewTokens, ...oldTokens].slice(0, 100);
+          });
+        }
+      }
+
+      // Handle migrated tokens
+      if (data.Solana?.Instructions && data.Solana.Instructions.length > 0) {
+        const migratedData = data.Solana.Instructions
+          .map(processMigratedData)
+          .filter((token): token is ProcessedToken => token !== null); // Filter out non-pump tokens
+        
+        if (migratedData.length > 0) {
+          queryClient.setQueryData(pulseQueryKeys.migratedTokens, (oldTokens: ProcessedToken[] = []) => {
+            const existingMintAddresses = new Set(oldTokens.map(token => token.mintAddress));
+            const uniqueNewTokens = migratedData.filter(token => !existingMintAddresses.has(token.mintAddress));
+            
+            return [...uniqueNewTokens, ...oldTokens].slice(0, 100);
+          });
+        }
       }
     };
 
@@ -57,9 +104,21 @@ export function useNewTokensWebSocket() {
   }, [queryClient]);
 
   return {
-    tokens,
-    isLoading,
+    newTokens,
+    finalStretchTokens,
+    migratedTokens,
+    isLoading: isLoadingNew || isLoadingFinal || isLoadingMigrated,
     isConnected: wsManagerRef.current !== null,
+  };
+}
+
+// Backward compatibility hook
+export function useNewTokensWebSocket() {
+  const { newTokens, isLoading, isConnected } = usePulseWebSocket();
+  return {
+    tokens: newTokens,
+    isLoading,
+    isConnected,
   };
 }
 

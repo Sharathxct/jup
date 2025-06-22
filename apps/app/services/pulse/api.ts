@@ -31,9 +31,89 @@ export interface TokenSupplyUpdate {
   };
 }
 
+export interface DEXPoolUpdate {
+  Pool: {
+    Market: {
+      BaseCurrency: {
+        MintAddress: string;
+        Name: string;
+        Symbol: string;
+      };
+      MarketAddress: string;
+      QuoteCurrency: {
+        MintAddress: string;
+        Name: string;
+        Symbol: string;
+      };
+    };
+    Dex: {
+      ProtocolName: string;
+      ProtocolFamily: string;
+    };
+    Base: {
+      PostAmount: string;
+    };
+    Quote: {
+      PostAmount: string;
+      PriceInUSD: number;
+      PostAmountInUSD: string;
+    };
+  };
+}
+
+export interface MigratedTokenUpdate {
+  Block: {
+    Height: string;
+    Time: string;
+  };
+  Transaction: {
+    Fee: string;
+    FeeInUSD: string;
+    Signature: string;
+    Signer: string;
+    FeePayer: string;
+    Result: {
+      Success: boolean;
+      ErrorMessage: string;
+    };
+  };
+  Instruction: {
+    Accounts: Array<{
+      Address: string;
+      IsWritable: boolean;
+      Token: {
+        Mint: string;
+        Owner: string;
+        ProgramId: string;
+      };
+    }>;
+    Program: {
+      Address: string;
+      Name: string;
+      Method: string;
+      Arguments: Array<{
+        Name: string;
+        Type: string;
+        Value: {
+          integer?: number;
+          bigInteger?: string;
+          string?: string;
+          address?: string;
+          bool?: boolean;
+          float?: number;
+          hex?: string;
+          json?: any;
+        };
+      }>;
+    };
+  };
+}
+
 export interface BitqueryResponse {
   Solana: {
     TokenSupplyUpdates: TokenSupplyUpdate[];
+    DEXPools?: DEXPoolUpdate[];
+    Instructions?: MigratedTokenUpdate[];
   };
 }
 
@@ -111,20 +191,146 @@ subscription {
   }
 }`;
 
+const FINAL_STRETCH_SUBSCRIPTION = `
+subscription {
+  Solana {
+    DEXPools(
+      where: {Pool: {Base: {PostAmount: {gt: "206900000", lt: "246555000"}}, Dex: {ProgramAddress: {is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"}}, Market: {QuoteCurrency: {MintAddress: {is: "11111111111111111111111111111111"}}}}, Transaction: {Result: {Success: true}}}
+    ) {
+      Pool {
+        Market {
+          BaseCurrency {
+            MintAddress
+            Name
+            Symbol
+          }
+          MarketAddress
+          QuoteCurrency {
+            MintAddress
+            Name
+            Symbol
+          }
+        }
+        Dex {
+          ProtocolName
+          ProtocolFamily
+        }
+        Base {
+          PostAmount
+        }
+        Quote {
+          PostAmount
+          PriceInUSD
+          PostAmountInUSD
+        }
+      }
+    }
+  }
+}`;
+
+const MIGRATED_TOKENS_SUBSCRIPTION = `
+subscription {
+  Solana {
+    Instructions( 
+      where: {Instruction: {Program: {Method: {is: "create_pool"}, Address: {is: "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"}}}}
+    ) {
+      Instruction {
+        Program {
+          Address
+          Name
+          Method
+          Arguments {
+            Name
+            Type
+            Value {
+              ... on Solana_ABI_Json_Value_Arg {
+                json
+              }
+              ... on Solana_ABI_Float_Value_Arg {
+                float
+              }
+              ... on Solana_ABI_Boolean_Value_Arg {
+                bool
+              }
+              ... on Solana_ABI_Bytes_Value_Arg {
+                hex
+              }
+              ... on Solana_ABI_BigInt_Value_Arg {
+                bigInteger
+              }
+              ... on Solana_ABI_Address_Value_Arg {
+                address
+              }
+              ... on Solana_ABI_String_Value_Arg {
+                string
+              }
+              ... on Solana_ABI_Integer_Value_Arg {
+                integer
+              }
+            }
+          }
+        }
+        Accounts {
+          Address
+          IsWritable
+          Token {
+            Mint
+            Owner
+            ProgramId
+          }
+        }
+      }
+      Transaction {
+        Fee
+        FeeInUSD
+        Signature
+        Signer
+        FeePayer
+        Result {
+          Success
+          ErrorMessage
+        }
+      }
+      Block {
+        Time
+        Height
+      }
+    }
+  }
+}`;
+
 export class PulseWebSocketManager {
+  private static instance: PulseWebSocketManager | null = null;
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private onDataCallback: ((data: BitqueryResponse) => void) | null = null;
+  private isConnecting = false;
+
+  // Singleton pattern to prevent multiple connections
+  static getInstance(): PulseWebSocketManager {
+    if (!PulseWebSocketManager.instance) {
+      PulseWebSocketManager.instance = new PulseWebSocketManager();
+    }
+    return PulseWebSocketManager.instance;
+  }
 
   connect(onData: (data: BitqueryResponse) => void) {
+    // Prevent multiple connection attempts
+    if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
+      this.onDataCallback = onData; // Update callback
+      return;
+    }
+
+    this.isConnecting = true;
     this.onDataCallback = onData;
     this.ws = new WebSocket(WS_URL, ["graphql-ws"]);
 
     this.ws.onopen = () => {
       console.log("Connected to Bitquery WebSocket");
       this.reconnectAttempts = 0;
+      this.isConnecting = false;
       
       // Send connection init
       this.send({ type: "connection_init" });
@@ -134,12 +340,30 @@ export class PulseWebSocketManager {
       const response = JSON.parse(event.data);
       
       if (response.type === "connection_ack") {
-        console.log("Connection acknowledged, starting subscription");
+        console.log("Connection acknowledged, starting subscriptions");
+        
+        // Start all three subscriptions
         this.send({
           type: "start",
           id: "new-tokens",
           payload: {
             query: NEW_TOKENS_SUBSCRIPTION,
+          },
+        });
+
+        this.send({
+          type: "start",
+          id: "final-stretch",
+          payload: {
+            query: FINAL_STRETCH_SUBSCRIPTION,
+          },
+        });
+
+        this.send({
+          type: "start",
+          id: "migrated-tokens",
+          payload: {
+            query: MIGRATED_TOKENS_SUBSCRIPTION,
           },
         });
       }
@@ -159,11 +383,13 @@ export class PulseWebSocketManager {
 
     this.ws.onclose = () => {
       console.log("WebSocket connection closed");
+      this.isConnecting = false;
       this.handleReconnect();
     };
 
     this.ws.onerror = (error) => {
       console.error("WebSocket error:", error);
+      this.isConnecting = false;
     };
   }
 
@@ -189,6 +415,8 @@ export class PulseWebSocketManager {
   disconnect() {
     if (this.ws) {
       this.send({ type: "stop", id: "new-tokens" });
+      this.send({ type: "stop", id: "final-stretch" });
+      this.send({ type: "stop", id: "migrated-tokens" });
       this.ws.close();
       this.ws = null;
     }
@@ -238,6 +466,94 @@ export function processTokenData(tokenUpdate: TokenSupplyUpdate): ProcessedToken
     tags: ['DS', '0%', '0%', `${Math.floor(Math.random() * 20)}%`],
     mintAddress: currency.MintAddress,
     uri: currency.Uri,
+    timestamp,
+  };
+}
+
+// Process Final Stretch token data (95% bonding curve completion)
+export function processFinalStretchData(poolUpdate: DEXPoolUpdate): ProcessedToken | null {
+  const currency = poolUpdate.Pool.Market.BaseCurrency;
+  
+  // Only process pump tokens (mint address ends with "pump")
+  if (!currency.MintAddress.endsWith('pump')) {
+    return null;
+  }
+  
+  const timestamp = new Date().toISOString(); // Current time since no timestamp in pool data
+  const timeAgo = getTimeAgo(timestamp);
+  
+  // Calculate bonding curve progress
+  const baseAmount = parseFloat(poolUpdate.Pool.Base.PostAmount);
+  const progress = Math.min(((baseAmount - 206900000) / (246555000 - 206900000)) * 5 + 95, 100);
+  
+  // Use actual market data
+  const priceUSD = parseFloat(poolUpdate.Pool.Quote.PostAmountInUSD);
+  const quoteAmount = parseFloat(poolUpdate.Pool.Quote.PostAmount);
+  
+  return {
+    id: currency.MintAddress,
+    name: currency.Name || currency.Symbol,
+    symbol: currency.Symbol,
+    icon: '🔥', // Fire icon for final stretch
+    price: `$${priceUSD.toLocaleString()}`,
+    change: `${quoteAmount.toFixed(2)} SOL`,
+    changePercent: Math.floor(progress),
+    marketCap: 'MC',
+    volume: 'v',
+    age: timeAgo,
+    holders: Math.floor(Math.random() * 5000) + 1000,
+    txns: Math.floor(Math.random() * 1000) + 100,
+    chart: 'trending_up',
+    tags: ['DS', `${progress.toFixed(1)}%`, 'Final Stretch'],
+    mintAddress: currency.MintAddress,
+    uri: '', // No URI available in pool data
+    timestamp,
+  };
+}
+
+// Process Migrated token data
+export function processMigratedData(instruction: MigratedTokenUpdate): ProcessedToken | null {
+  const timestamp = instruction.Block.Time;
+  const timeAgo = getTimeAgo(timestamp);
+  
+  // Try to extract pump token info from accounts (look for tokens ending with "pump")
+  const tokenAccounts = instruction.Instruction.Accounts.filter(acc => 
+    acc.Token.Mint && 
+    acc.Token.Mint !== 'So11111111111111111111111111111111112' &&
+    acc.Token.Mint.endsWith('pump')
+  );
+  
+  if (tokenAccounts.length === 0) {
+    // No pump tokens found in this migration
+    return null;
+  }
+  
+  const baseMint = tokenAccounts[0].Token.Mint;
+  
+  // Extract amounts from arguments
+  const baseAmountArg = instruction.Instruction.Program.Arguments.find(arg => arg.Name === 'base_amount_in');
+  const quoteAmountArg = instruction.Instruction.Program.Arguments.find(arg => arg.Name === 'quote_amount_in');
+  
+  const baseAmount = baseAmountArg?.Value.bigInteger ? parseInt(baseAmountArg.Value.bigInteger) / 1000000 : 0;
+  const quoteAmount = quoteAmountArg?.Value.bigInteger ? parseInt(quoteAmountArg.Value.bigInteger) / 1000000000 : 0;
+  
+  return {
+    id: baseMint,
+    name: `Migrated Token`,
+    symbol: 'MIG',
+    icon: '🚀', // Rocket icon for migrated tokens
+    price: `$${(quoteAmount * 128).toLocaleString()}`, // Rough price calculation
+    change: `${quoteAmount.toFixed(2)} SOL`,
+    changePercent: Math.floor(Math.random() * 50) + 10,
+    marketCap: 'MC',
+    volume: 'v',
+    age: timeAgo,
+    holders: Math.floor(Math.random() * 10000) + 5000,
+    txns: Math.floor(Math.random() * 2000) + 500,
+    chart: 'trending_up',
+    tags: ['Migrated', 'Raydium', 'Liquid'],
+    mintAddress: baseMint,
+    uri: '', // No URI available in instruction data
     timestamp,
   };
 }
