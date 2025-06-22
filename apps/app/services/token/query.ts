@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
   fetchTokenMetadata, 
   fetchTradingPairs, 
@@ -8,12 +8,18 @@ import {
   fetchSolanaPrice,
   calculateTokenStats,
   convertToChartData,
+  getJupiterQuote,
+  getJupiterSellQuote,
+  buildJupiterSwapTransaction,
   TokenMetadata,
   TradingPair,
   OHLCVData,
   ChartData,
   TokenStats,
-  SolanaPriceData
+  SolanaPriceData,
+  JupiterQuoteResponse,
+  JupiterSwapResponse,
+  checkTokenAvailability
 } from './api';
 
 // Hook for fetching Solana price
@@ -108,4 +114,81 @@ export function useTokenTradingData(mintAddress: string) {
     isLoading: isLoadingMetadata || isLoadingPairs || isLoadingOHLCV || isLoadingSolana,
     hasData: !!metadata && !!ohlcvData && ohlcvData.length > 0 && !!solanaPrice,
   };
+}
+
+// Query for buying tokens with SOL
+export const useBuyQuote = (tokenMint: string, solAmount: number, slippageBps: number = 500) => {
+  return useQuery({
+    queryKey: ['buyQuote', tokenMint, solAmount, slippageBps],
+    queryFn: async () => {
+      if (solAmount <= 0) return null;
+      
+      try {
+        // Check token availability first
+        const isAvailable = await checkTokenAvailability(tokenMint);
+        
+        const quote = await getJupiterQuote(tokenMint, solAmount, slippageBps);
+        
+        if (!quote && !isAvailable) {
+          throw new Error('Token not available on Jupiter. It might be too new or not have enough liquidity.');
+        }
+        
+        return quote;
+      } catch (error) {
+        console.error('Buy quote error:', error);
+        throw error;
+      }
+    },
+    enabled: !!tokenMint && solAmount > 0,
+    staleTime: 15 * 1000, // 15 seconds
+    retry: 1, // Only retry once for faster error feedback
+  });
+};
+
+// Query for selling tokens for SOL  
+export const useSellQuote = (tokenMint: string, tokenAmount: number, decimals: number = 9, slippageBps: number = 500) => {
+  return useQuery({
+    queryKey: ['sellQuote', tokenMint, tokenAmount, decimals, slippageBps],
+    queryFn: async () => {
+      if (tokenAmount <= 0) return null;
+      
+      try {
+        // Check token availability first
+        const isAvailable = await checkTokenAvailability(tokenMint);
+        
+        // Convert token amount considering decimals
+        const amountInBaseUnits = Math.floor(tokenAmount * Math.pow(10, decimals));
+        const quote = await getJupiterSellQuote(tokenMint, amountInBaseUnits, slippageBps);
+        
+        if (!quote && !isAvailable) {
+          throw new Error('Token not available on Jupiter. It might be too new or not have enough liquidity.');
+        }
+        
+        return quote;
+      } catch (error) {
+        console.error('Sell quote error:', error);
+        throw error;
+      }
+    },
+    enabled: !!tokenMint && tokenAmount > 0,
+    staleTime: 15 * 1000, // 15 seconds
+    retry: 1, // Only retry once for faster error feedback
+  });
+};
+
+// Mutation hook for building and executing swap transactions
+export function useJupiterSwap() {
+  return useMutation({
+    mutationFn: async ({ 
+      quote, 
+      userPublicKey,
+      priorityFee
+    }: { 
+      quote: JupiterQuoteResponse; 
+      userPublicKey: string;
+      priorityFee?: number;
+    }) => {
+      return buildJupiterSwapTransaction(quote, userPublicKey, priorityFee);
+    },
+  });
 } 

@@ -49,8 +49,38 @@ export interface TokenStats {
   marketCap: number;
 }
 
+// Jupiter Swap API interfaces and functions
+export interface JupiterQuoteResponse {
+  inputMint: string;
+  inAmount: string;
+  outputMint: string;
+  outAmount: string;
+  otherAmountThreshold: string;
+  swapMode: string;
+  slippageBps: number;
+  platformFee?: any;
+  priceImpactPct: string;
+  routePlan: any[];
+  contextSlot: number;
+  timeTaken: number;
+}
+
+export interface JupiterSwapResponse {
+  swapTransaction: string;
+  lastValidBlockHeight: number;
+  prioritizationFeeLamports: number;
+  computeUnitLimit: number;
+  prioritizationType: any;
+  dynamicSlippageReport?: any;
+  simulationError: any;
+}
+
 const BITQUERY_ENDPOINT = 'https://streaming.bitquery.io/eap';
 const BITQUERY_TOKEN = "ory_at_8iZLjU4IUpd1pFNCW03KzHcnjgA27-6ZHwVfqdXOnqI.sEB3TBQIDc_3gLHqoKZho9Ob7h_rmq8h8LB1dKAF2qE";
+
+// SOL mint address (wrapped SOL)
+export const SOL_MINT = 'So11111111111111111111111111111111111111112';
+export const JUPITER_API_BASE = 'https://quote-api.jup.ag';
 
 // Fetch token metadata by mint address
 export async function fetchTokenMetadata(mintAddress: string): Promise<TokenMetadata | null> {
@@ -395,4 +425,236 @@ export function formatMarketCap(marketCap: number): string {
     // For very small values, show with appropriate decimals
     return `$${marketCap.toFixed(3)}`;
   }
-} 
+}
+
+// Check if token is available on Jupiter
+export async function checkTokenAvailability(mintAddress: string): Promise<boolean> {
+  try {
+    const response = await fetch(`https://tokens.jup.ag/token/${mintAddress}`);
+    const isAvailable = response.ok;
+    console.log(`Token ${mintAddress} availability on Jupiter:`, isAvailable);
+    return isAvailable;
+  } catch (error) {
+    console.error('Error checking token availability:', error);
+    return false;
+  }
+}
+
+// Get list of all tokens supported by Jupiter
+export async function getJupiterTokenList(): Promise<any[]> {
+  try {
+    const response = await fetch('https://tokens.jup.ag/tokens?tags=verified');
+    if (!response.ok) {
+      console.error('Failed to fetch Jupiter token list');
+      return [];
+    }
+    const tokens = await response.json();
+    console.log('Jupiter supports', tokens.length, 'tokens');
+    return tokens;
+  } catch (error) {
+    console.error('Error fetching Jupiter token list:', error);
+    return [];
+  }
+}
+
+// Get Jupiter quote for SOL to token swap
+export async function getJupiterQuote(
+  outputMint: string,
+  amount: number, // Amount in SOL
+  slippageBps: number = 500 // Default 5% slippage (more lenient)
+): Promise<JupiterQuoteResponse | null> {
+  try {
+    // Minimum amount validation - Jupiter needs at least 0.001 SOL
+    if (amount < 0.001) {
+      console.warn('Amount too small for Jupiter routing, minimum is 0.001 SOL');
+      return null;
+    }
+
+    // Check if token is available first
+    const isAvailable = await checkTokenAvailability(outputMint);
+    if (!isAvailable) {
+      console.warn(`Token ${outputMint} is not available on Jupiter. It might be too new or not have sufficient liquidity.`);
+      // Don't return null immediately, still try the quote
+    }
+
+    // Convert SOL amount to lamports (1 SOL = 1e9 lamports)
+    const amountInLamports = Math.floor(amount * 1e9);
+    
+    const params = new URLSearchParams({
+      inputMint: SOL_MINT,
+      outputMint: outputMint,
+      amount: amountInLamports.toString(),
+      slippageBps: slippageBps.toString(),
+      // Remove restrictive parameters
+      // onlyDirectRoutes: 'false',
+      // asLegacyTransaction: 'false'
+    });
+
+    const response = await fetch(`${JUPITER_API_BASE}/v6/quote?${params}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Jupiter quote failed:', response.statusText, errorText);
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error?.includes('No route found')) {
+          console.error(`No trading route found for token ${outputMint}. This token might not be tradeable on Jupiter yet.`);
+        } else if (errorData.error?.includes('Cannot compute other amount threshold')) {
+          console.warn('Quote computation threshold warning - this is usually non-critical');
+          // Don't throw error for this warning, just log it
+        }
+      } catch (parseError) {
+        // If we can't parse the error, treat it as a regular failure
+      }
+      
+      return null;
+    }
+
+    const quote = await response.json();
+    console.log('Jupiter quote response:', quote);
+    
+    // Validate quote has required fields
+    if (!quote.outAmount || !quote.inAmount) {
+      console.error('Invalid quote response - missing amount fields');
+      return null;
+    }
+    
+    return quote;
+  } catch (error) {
+    console.error('Error getting Jupiter quote:', error);
+    return null;
+  }
+}
+
+// Get Jupiter quote for token to SOL swap (sell)
+export async function getJupiterSellQuote(
+  inputMint: string,
+  amount: number, // Amount in tokens (considering decimals)
+  slippageBps: number = 500 // Default 5% slippage
+): Promise<JupiterQuoteResponse | null> {
+  try {
+    // Minimum amount validation
+    if (amount <= 0) {
+      console.warn('Amount must be greater than 0');
+      return null;
+    }
+
+    // Check if token is available first
+    const isAvailable = await checkTokenAvailability(inputMint);
+    if (!isAvailable) {
+      console.warn(`Token ${inputMint} is not available on Jupiter. It might be too new or not have sufficient liquidity.`);
+      // Don't return null immediately, still try the quote
+    }
+
+    const params = new URLSearchParams({
+      inputMint: inputMint,
+      outputMint: SOL_MINT,
+      amount: amount.toString(),
+      slippageBps: slippageBps.toString(),
+    });
+
+    const response = await fetch(`${JUPITER_API_BASE}/v6/quote?${params}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Jupiter sell quote failed:', response.statusText, errorText);
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error?.includes('No route found')) {
+          console.error(`No trading route found for token ${inputMint}. This token might not be tradeable on Jupiter yet.`);
+        } else if (errorData.error?.includes('Cannot compute other amount threshold')) {
+          console.warn('Quote computation threshold warning - this is usually non-critical');
+          // Don't throw error for this warning, just log it
+        }
+      } catch (parseError) {
+        // If we can't parse the error, treat it as a regular failure
+      }
+      
+      return null;
+    }
+
+    const quote = await response.json();
+    console.log('Jupiter sell quote response:', quote);
+    
+    // Validate quote has required fields
+    if (!quote.outAmount || !quote.inAmount) {
+      console.error('Invalid sell quote response - missing amount fields');
+      return null;
+    }
+    
+    return quote;
+  } catch (error) {
+    console.error('Error getting Jupiter sell quote:', error);
+    return null;
+  }
+}
+
+// Build swap transaction using Jupiter API
+export async function buildJupiterSwapTransaction(
+  quote: JupiterQuoteResponse,
+  userPublicKey: string,
+  priorityFee?: number
+): Promise<JupiterSwapResponse | null> {
+  try {
+    // Enhanced request body for v6 API
+    const swapRequest: any = {
+      quoteResponse: quote,
+      userPublicKey: userPublicKey,
+      wrapAndUnwrapSol: true,
+      // Removed useSharedAccounts as it causes issues with simple AMMs
+      asLegacyTransaction: false, // Use versioned transactions
+    };
+
+    // Only add priority fee if specified
+    if (priorityFee) {
+      swapRequest.prioritizationFeeLamports = priorityFee;
+    }
+
+    console.log('Swap request payload:', JSON.stringify(swapRequest, null, 2));
+
+    const response = await fetch(`https://quote-api.jup.ag/v6/swap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(swapRequest),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Jupiter swap transaction build failed:', response.status, errorText);
+      
+      // Parse error for better handling
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error?.includes('Missing token program')) {
+          throw new Error('Token not available for trading on Jupiter. It might be too new or not have enough liquidity.');
+        }
+        if (errorData.error?.includes('Simple AMMs are not supported')) {
+          // Try again without shared accounts (already removed above)
+          throw new Error('Trading route not available for this token pair.');
+        }
+        throw new Error(errorData.error || 'Failed to build swap transaction');
+      } catch (parseError) {
+        throw new Error(errorText || 'Failed to build swap transaction');
+      }
+    }
+
+    const swapResponse = await response.json();
+    console.log('Jupiter swap response:', swapResponse);
+    
+    // Validate that we have a valid transaction
+    if (!swapResponse.swapTransaction) {
+      throw new Error('No transaction returned from Jupiter');
+    }
+    
+    return swapResponse;
+  } catch (error) {
+    console.error('Error building Jupiter swap transaction:', error);
+    throw error; // Re-throw to be handled by caller
+  }
+}
+
+ 
