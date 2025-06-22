@@ -311,6 +311,7 @@ export default function TradingPage() {
               >
                 {`${selectedTab} 764`}
               </button>
+              <img src="/poweredbyjupiter-dark.svg" alt="SOL" className="w-full h-10" />
             </div>
           </div>
 
