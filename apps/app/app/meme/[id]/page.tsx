@@ -3,20 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
 import { 
-  Bell, 
-  ChevronDown, 
   Copy, 
   ExternalLink, 
-  LayoutGrid, 
-  Maximize2, 
-  Settings, 
   Share2, 
   Star,
-  Search,
   X
 } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 
 export default function TradingPage() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -24,9 +16,6 @@ export default function TradingPage() {
   const [selectedTab, setSelectedTab] = useState<'buy' | 'sell'>('buy');
   const [showSlippagePopup, setShowSlippagePopup] = useState(false);
   const [maxSlippage, setMaxSlippage] = useState('2');
-  const [tipAmount, setTipAmount] = useState('0.003');
-  const [frontRunProtection, setFrontRunProtection] = useState(false);
-  const pathname = usePathname();
 
   const handleTabChange = (tab: 'buy' | 'sell') => {
     setSelectedTab(tab);
@@ -102,42 +91,8 @@ export default function TradingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-black">
-      {/* Navigation */}
-      <nav className="bg-[#111827]/50 border-b border-[#1F2937] px-6 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <svg width="32" height="32" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" clipRule="evenodd" d="M122.363 90.3495C117.674 95.9288 117.674 104.071 122.363 109.65L160.767 155.349C168.968 165.108 162.031 180 149.284 180H51.0288C38.2821 180 31.3446 165.108 39.5454 155.349L77.9499 109.65C82.6386 104.071 82.6386 95.9288 77.9498 90.3495L39.5453 44.6504C31.3446 34.8921 38.2821 20 51.0288 20L149.284 20C162.03 20 168.968 34.8921 160.767 44.6504L122.363 90.3495Z" fill="url(#paint0_linear_105_736)"/>
-                  <defs>
-                    <linearGradient id="paint0_linear_105_736" x1="149.557" y1="20" x2="39.7213" y2="117.692" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#B0B9FF"/>
-                      <stop offset="1" stopColor="#E7E9FF"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-              <span className="text-white font-medium">Blaze</span>
-            </div>
-            
-            <div className="flex items-center gap-6">
-              <Link href="/pulse" className={`${pathname === '/pulse' ? 'text-blue-400' : 'text-gray-400'}`}>Pulse</Link>
-              <Link href="/portfolio" className={`${pathname === '/portfolio' ? 'text-blue-400' : 'text-gray-400'}`}>Portfolio</Link>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <Search className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" />
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5">
-              connect
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      <div className="flex flex-col h-[calc(100vh-64px)]">
+    <div className="h-[calc(100vh-52px)] bg-black">
+      <div className="flex flex-col h-full">
         {/* Token Metadata Line */}
         <div className="flex items-center justify-between px-6 py-3 bg-[#111827] border-b border-[#1F2937]">
           <div className="flex items-center gap-4">
@@ -164,12 +119,12 @@ export default function TradingPage() {
         </div>
 
         {/* Main Content */}
-        <div className="flex flex-1 relative">
+        <div className="flex flex-1 relative overflow-hidden">
           {/* Chart */}
           <div className="flex-1 h-full" ref={chartContainerRef} />
 
           {/* Trading Panel */}
-          <div className="w-80 bg-[#1A1F2B] h-full">
+          <div className="w-80 bg-[#1A1F2B] h-full overflow-y-auto">
             <div className="flex flex-col gap-4 p-4">
               {/* Buy/Sell Tabs */}
               <div className="grid grid-cols-2 gap-2">
@@ -216,7 +171,6 @@ export default function TradingPage() {
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   <span className="text-white">Sol</span>
-                  <img src="/solana.svg" alt="SOL" className="w-5 h-5" />
                 </div>
               </div>
 
@@ -309,7 +263,7 @@ export default function TradingPage() {
                     : 'bg-[#F87171] hover:bg-[#EF4444]'
                 }`}
               >
-                {`${selectedTab} 764`}
+                {`${selectedTab}`}
               </button>
               <img src="/poweredbyjupiter-dark.svg" alt="SOL" className="w-full h-10" />
             </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ClientLayout } from "./client-layout";
 
 export const metadata: Metadata = {
   title: "Blaze - The Gateway to DeFi",
@@ -13,10 +14,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body
-        className="antialiased bg-[#0A0A0A] text-white"
-      >
-        {children}
+      <body className="antialiased bg-[#0A0A0A] text-white">
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );
