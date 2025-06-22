@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
+import { useParams } from 'next/navigation';
+import { createChart, ColorType, CrosshairMode, LineStyle } from 'lightweight-charts';
 import { 
   Copy, 
   ExternalLink, 
@@ -9,13 +10,21 @@ import {
   Star,
   X
 } from 'lucide-react';
+import { useTokenTradingData, useTokenImage } from '@/services/token/query';
+import { formatPrice, formatNumber, formatMarketCap } from '@/services/token/api';
 
 export default function TradingPage() {
+  const params = useParams();
+  const tokenId = params.id as string;
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [amount, setAmount] = useState('0.00');
   const [selectedTab, setSelectedTab] = useState<'buy' | 'sell'>('buy');
   const [showSlippagePopup, setShowSlippagePopup] = useState(false);
   const [maxSlippage, setMaxSlippage] = useState('2');
+
+  // Fetch token data
+  const { metadata, chartData, stats, isLoading, hasData } = useTokenTradingData(tokenId);
+  const { data: tokenImage, isLoading: isLoadingImage } = useTokenImage(metadata?.uri || '');
 
   const handleTabChange = (tab: 'buy' | 'sell') => {
     setSelectedTab(tab);
@@ -37,58 +46,101 @@ export default function TradingPage() {
   };
 
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    if (!chartContainerRef.current || !hasData || !chartData || chartData.length === 0) return;
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: '#0A0A0A' },
-        textColor: '#D1D5DB',
+        textColor: '#9CA3AF',
+        fontSize: 12,
       },
       grid: {
-        vertLines: { color: '#1F2937' },
-        horzLines: { color: '#1F2937' },
+        vertLines: { 
+          color: '#1F2937',
+          style: LineStyle.Solid,
+          visible: true,
+        },
+        horzLines: { 
+          color: '#1F2937',
+          style: LineStyle.Solid,
+          visible: true,
+        },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
+        vertLine: {
+          color: '#6B7280',
+          width: 1,
+          style: LineStyle.Dashed,
+        },
+        horzLine: {
+          color: '#6B7280',
+          width: 1,
+          style: LineStyle.Dashed,
+        },
       },
       rightPriceScale: {
-        borderColor: '#1F2937',
+        borderColor: '#374151',
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+        autoScale: true,
+        alignLabels: true,
+        ticksVisible: true,
+        entireTextOnly: false,
       },
       timeScale: {
-        borderColor: '#1F2937',
+        borderColor: '#374151',
         timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 5,
+        barSpacing: 6,
+        minBarSpacing: 2,
       },
       handleScroll: {
         mouseWheel: true,
         pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
       },
       handleScale: {
         axisPressedMouseMove: true,
         mouseWheel: true,
         pinch: true,
       },
+      kineticScroll: {
+        mouse: true,
+        touch: true,
+      },
     });
 
     const candlestickSeries = chart.addCandlestickSeries({
       upColor: '#22C55E',
       downColor: '#EF4444',
-      borderVisible: false,
+      borderVisible: true,
+      borderUpColor: '#22C55E',
+      borderDownColor: '#EF4444',
       wickUpColor: '#22C55E',
       wickDownColor: '#EF4444',
+      wickVisible: true,
+      priceFormat: {
+        type: 'custom',
+        minMove: 1,
+        formatter: (price: number) => formatMarketCap(price),
+      },
     });
 
-    const data = [
-      { time: '2024-01-01', open: 6500, high: 6850, low: 6400, close: 6800 },
-      { time: '2024-01-02', open: 6800, high: 7100, low: 6700, close: 6950 },
-    ];
-
-    candlestickSeries.setData(data);
+    // Set the chart data
+    candlestickSeries.setData(chartData as any);
+    
+    // Fit content with some padding
     chart.timeScale().fitContent();
 
     return () => {
       chart.remove();
     };
-  }, []);
+  }, [hasData, chartData]);
 
   return (
     <div className="h-[calc(100vh-52px)] bg-black">
@@ -97,31 +149,90 @@ export default function TradingPage() {
         <div className="flex items-center justify-between px-6 py-3 bg-[#111827] border-b border-[#1F2937]">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <img src="/logo.svg" alt="Token" className="w-6 h-6" />
-              <span className="text-white font-medium">764</span>
-              <span className="text-gray-400">Roblo.x T...</span>
+              {isLoadingImage ? (
+                <div className="w-6 h-6 bg-gray-600 rounded animate-pulse"></div>
+              ) : tokenImage ? (
+                <img 
+                  src={tokenImage} 
+                  alt="Token" 
+                  className="w-6 h-6 rounded"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : (
+                <div className='w-6 h-6 bg-gray-600 rounded animate-pulse'></div>
+              )}
+              {isLoading ? (
+                <div className="animate-pulse">
+                  <div className="h-4 bg-gray-600 rounded w-20"></div>
+                </div>
+              ) : (
+                <>
+                  <span className="text-white font-medium">{metadata?.symbol || 'TOKEN'}</span>
+                  <span className="text-gray-400">{metadata?.name ? `${metadata.name.slice(0, 10)}...` : 'Loading...'}</span>
+                </>
+              )}
             </div>
             <div className="text-gray-400">|</div>
             <div className="flex items-center gap-4 text-sm">
-              <span className="text-gray-400">Price: <span className="text-white">$6.51K</span></span>
-              <span className="text-gray-400">Liquidity: <span className="text-white">$10.9K</span></span>
-              <span className="text-gray-400">Supply: <span className="text-white">1B</span></span>
-              <span className="text-gray-400">Global Fees Paid: <span className="text-white">1.221</span></span>
-              <span className="text-gray-400">B.Curve: <span className="text-green-400">29.94%</span></span>
+              {isLoading ? (
+                <div className="flex gap-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-3 bg-gray-600 rounded w-16"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <span className="text-gray-400">Price: <span className="text-white">{formatPrice(stats.price)}</span></span>
+                  <span className="text-gray-400">Liquidity: <span className="text-white">{formatNumber(stats.liquidity)} SOL</span></span>
+                  <span className="text-gray-400">Supply: <span className="text-white">{formatNumber(stats.supply)}</span></span>
+                  <span className="text-gray-400">Global Fees Paid: <span className="text-white">{stats.globalFeesPaid.toFixed(3)}</span></span>
+                  <span className="text-gray-400">B.Curve: <span className="text-green-400">{stats.bondingCurveProgress.toFixed(2)}%</span></span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Star className="w-5 h-5 text-gray-400" />
-            <Share2 className="w-5 h-5 text-gray-400" />
-            <Copy className="w-5 h-5 text-gray-400" />
-            <ExternalLink className="w-5 h-5 text-gray-400" />
+            <Star className="w-5 h-5 text-gray-400 hover:text-yellow-400 cursor-pointer" />
+            <Share2 className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" />
+            <Copy 
+              className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" 
+              onClick={() => navigator.clipboard.writeText(tokenId)}
+            />
+            <ExternalLink 
+              className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer"
+              onClick={() => window.open(`https://solscan.io/token/${tokenId}`, '_blank')}
+            />
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex flex-1 relative overflow-hidden">
+        <div className="flex flex-1 overflow-hidden">
           {/* Chart */}
-          <div className="flex-1 h-full" ref={chartContainerRef} />
+          <div className="flex-1 relative">
+            {isLoading ? (
+              <div className="w-full h-full bg-black flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                  <div className="text-white text-sm">Loading chart data...</div>
+                </div>
+              </div>
+            ) : !hasData ? (
+              <div className="w-full h-full bg-black flex items-center justify-center">
+                <div className="text-center text-gray-400">
+                  <div className="text-lg mb-2">📊</div>
+                  <div>No trading data available</div>
+                  <div className="text-sm">Token may be too new or not actively traded</div>
+                </div>
+              </div>
+            ) : (
+              <div ref={chartContainerRef} className="w-full h-full" />
+            )}
+          </div>
 
           {/* Trading Panel */}
           <div className="w-80 bg-[#1A1F2B] h-full overflow-y-auto">

@@ -149,7 +149,7 @@ export interface ProcessedToken {
   metadata?: TokenMetadata;
 }
 
-const BITQUERY_TOKEN = "ory_at_8iZLjU4IUpd1pFNCW03KzHcnjgA27-6ZHwVfqdXOnqI.sEB3TBQIDc_3gLHqoKZho9Ob7h_rmq8h8LB1dKAF2qE";
+const BITQUERY_TOKEN = "ory_at_7n6IScrUmqGGacRs9KXo7juwVo6z3QS14zLaRxNMZPw.9S7gr25GZYuUpONrVEIo8uvqxl3eaHFzFTBXyubk89w";
 const WS_URL = `wss://streaming.bitquery.io/eap?token=${BITQUERY_TOKEN}`;
 
 const NEW_TOKENS_SUBSCRIPTION = `
