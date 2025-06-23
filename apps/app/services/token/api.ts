@@ -76,7 +76,7 @@ export interface JupiterSwapResponse {
 }
 
 const BITQUERY_ENDPOINT = 'https://streaming.bitquery.io/eap';
-const BITQUERY_TOKEN = "ory_at_8iZLjU4IUpd1pFNCW03KzHcnjgA27-6ZHwVfqdXOnqI.sEB3TBQIDc_3gLHqoKZho9Ob7h_rmq8h8LB1dKAF2qE";
+const BITQUERY_TOKEN = "ory_at_10Lps2s1RKWZVM9w_ofp8QT-n9c_cEhET4Afcc9Q8Oo.IHESG9yvcnECPOOtSHm7OBoy0yoovV0O_3hpwLk3NAA";
 
 // SOL mint address (wrapped SOL)
 export const SOL_MINT = 'So11111111111111111111111111111111111111112';
