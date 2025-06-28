@@ -30,8 +30,8 @@ Blaze Trade is built on a modern, scalable architecture:
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd blaze-trade
+   git clone git@github.com:Sharathxct/jup.git
+   cd jup
    ```
 
 2. **Install dependencies**
@@ -87,10 +87,3 @@ Blaze Trade leverages Jupiter's powerful APIs:
 
 This project was developed for the Jupiverse Hackathon, showcasing the potential of Jupiter's ecosystem for building advanced DeFi trading platforms.
 
-## 🚀 Deployment
-
-The project is configured for containerized deployment using Docker and Docker Compose. See the included `docker-compose.yml` for production deployment configuration.
-
-## 📄 License
-
-This project is open source and available under the MIT License.
