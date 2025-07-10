@@ -149,7 +149,7 @@ export interface ProcessedToken {
   metadata?: TokenMetadata;
 }
 
-const BITQUERY_TOKEN = "ory_at_10Lps2s1RKWZVM9w_ofp8QT-n9c_cEhET4Afcc9Q8Oo.IHESG9yvcnECPOOtSHm7OBoy0yoovV0O_3hpwLk3NAA";
+const BITQUERY_TOKEN = "ory_at_0NlxWHLGYknXfHwJ31_MmSalZWOWjW6fFQ1CbmHImIE.v6_jEdT8sIxWzGATC1PnK2uGE79okUZkdzc5L34clOM";
 const WS_URL = `wss://streaming.bitquery.io/eap?token=${BITQUERY_TOKEN}`;
 
 const NEW_TOKENS_SUBSCRIPTION = `
@@ -331,17 +331,17 @@ export class PulseWebSocketManager {
       console.log("Connected to Bitquery WebSocket");
       this.reconnectAttempts = 0;
       this.isConnecting = false;
-      
+
       // Send connection init
       this.send({ type: "connection_init" });
     };
 
     this.ws.onmessage = (event) => {
       const response = JSON.parse(event.data);
-      
+
       if (response.type === "connection_ack") {
         console.log("Connection acknowledged, starting subscriptions");
-        
+
         // Start all three subscriptions
         this.send({
           type: "start",
@@ -403,7 +403,7 @@ export class PulseWebSocketManager {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-      
+
       setTimeout(() => {
         if (this.onDataCallback) {
           this.connect(this.onDataCallback);
@@ -443,12 +443,12 @@ export function processTokenData(tokenUpdate: TokenSupplyUpdate): ProcessedToken
   const currency = tokenUpdate.TokenSupplyUpdate.Currency;
   const timestamp = tokenUpdate.Block.Time;
   const timeAgo = getTimeAgo(timestamp);
-  
+
   // Generate a random price and change for display (since we don't have market data yet)
   const randomPrice = Math.floor(Math.random() * 100000) + 1000;
   const randomChange = Math.floor(Math.random() * 50000) + 500;
   const randomChangePercent = Math.floor(Math.random() * 100) + 1;
-  
+
   return {
     id: currency.MintAddress,
     name: currency.Name || currency.Symbol,
@@ -473,23 +473,23 @@ export function processTokenData(tokenUpdate: TokenSupplyUpdate): ProcessedToken
 // Process Final Stretch token data (95% bonding curve completion)
 export function processFinalStretchData(poolUpdate: DEXPoolUpdate): ProcessedToken | null {
   const currency = poolUpdate.Pool.Market.BaseCurrency;
-  
+
   // Only process pump tokens (mint address ends with "pump")
   if (!currency.MintAddress.endsWith('pump')) {
     return null;
   }
-  
+
   const timestamp = new Date().toISOString(); // Current time since no timestamp in pool data
   const timeAgo = getTimeAgo(timestamp);
-  
+
   // Calculate bonding curve progress
   const baseAmount = parseFloat(poolUpdate.Pool.Base.PostAmount);
   const progress = Math.min(((baseAmount - 206900000) / (246555000 - 206900000)) * 5 + 95, 100);
-  
+
   // Use actual market data
   const priceUSD = parseFloat(poolUpdate.Pool.Quote.PostAmountInUSD);
   const quoteAmount = parseFloat(poolUpdate.Pool.Quote.PostAmount);
-  
+
   return {
     id: currency.MintAddress,
     name: currency.Name || currency.Symbol,
@@ -515,28 +515,28 @@ export function processFinalStretchData(poolUpdate: DEXPoolUpdate): ProcessedTok
 export function processMigratedData(instruction: MigratedTokenUpdate): ProcessedToken | null {
   const timestamp = instruction.Block.Time;
   const timeAgo = getTimeAgo(timestamp);
-  
+
   // Try to extract pump token info from accounts (look for tokens ending with "pump")
-  const tokenAccounts = instruction.Instruction.Accounts.filter(acc => 
-    acc.Token.Mint && 
+  const tokenAccounts = instruction.Instruction.Accounts.filter(acc =>
+    acc.Token.Mint &&
     acc.Token.Mint !== 'So11111111111111111111111111111111112' &&
     acc.Token.Mint.endsWith('pump')
   );
-  
+
   if (tokenAccounts.length === 0) {
     // No pump tokens found in this migration
     return null;
   }
-  
+
   const baseMint = tokenAccounts[0].Token.Mint;
-  
+
   // Extract amounts from arguments
   const baseAmountArg = instruction.Instruction.Program.Arguments.find(arg => arg.Name === 'base_amount_in');
   const quoteAmountArg = instruction.Instruction.Program.Arguments.find(arg => arg.Name === 'quote_amount_in');
-  
+
   const baseAmount = baseAmountArg?.Value.bigInteger ? parseInt(baseAmountArg.Value.bigInteger) / 1000000 : 0;
   const quoteAmount = quoteAmountArg?.Value.bigInteger ? parseInt(quoteAmountArg.Value.bigInteger) / 1000000000 : 0;
-  
+
   return {
     id: baseMint,
     name: `Migrated Token`,
@@ -562,11 +562,11 @@ function getTimeAgo(timestamp: string): string {
   const now = new Date();
   const time = new Date(timestamp);
   const diffMs = now.getTime() - time.getTime();
-  
+
   const diffSeconds = Math.floor(diffMs / 1000);
   const diffMinutes = Math.floor(diffSeconds / 60);
   const diffHours = Math.floor(diffMinutes / 60);
-  
+
   if (diffSeconds < 60) {
     return `${diffSeconds}s`;
   } else if (diffMinutes < 60) {

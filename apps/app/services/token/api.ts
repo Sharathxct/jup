@@ -76,7 +76,7 @@ export interface JupiterSwapResponse {
 }
 
 const BITQUERY_ENDPOINT = 'https://streaming.bitquery.io/eap';
-const BITQUERY_TOKEN = "ory_at_10Lps2s1RKWZVM9w_ofp8QT-n9c_cEhET4Afcc9Q8Oo.IHESG9yvcnECPOOtSHm7OBoy0yoovV0O_3hpwLk3NAA";
+const BITQUERY_TOKEN = "ory_at_0NlxWHLGYknXfHwJ31_MmSalZWOWjW6fFQ1CbmHImIE.v6_jEdT8sIxWzGATC1PnK2uGE79okUZkdzc5L34clOM";
 
 // SOL mint address (wrapped SOL)
 export const SOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -139,13 +139,13 @@ export async function fetchTokenMetadata(mintAddress: string): Promise<TokenMeta
 
     const data = await response.json();
     const tokenUpdate = data.data?.Solana?.TokenSupplyUpdates?.[0];
-    
+
     if (!tokenUpdate) {
       return null;
     }
 
     const currency = tokenUpdate.TokenSupplyUpdate.Currency;
-    
+
     return {
       name: currency.Name,
       symbol: currency.Symbol,
@@ -210,7 +210,7 @@ export async function fetchTradingPairs(mintAddress: string): Promise<TradingPai
 
     const data = await response.json();
     const trades = data.data?.Solana?.DEXTradeByTokens || [];
-    
+
     return trades.map((trade: any) => ({
       marketAddress: trade.Trade.Market.MarketAddress,
       protocolName: trade.Trade.Dex.ProtocolName,
@@ -271,7 +271,7 @@ export async function fetchOHLCVData(mintAddress: string, limit: number = 240): 
 
     const data = await response.json();
     const trades = data.data?.Solana?.DEXTradeByTokens || [];
-    
+
     return trades
       .map((trade: any) => ({
         time: trade.Block.Timefield,
@@ -312,13 +312,13 @@ export async function fetchSolanaPrice(): Promise<SolanaPriceData> {
 // Convert OHLCV data to chart data with realistic market cap calculation
 export function convertToChartData(ohlcvData: OHLCVData[], solanaPrice: number = 0): ChartData[] {
   if (ohlcvData.length === 0 || solanaPrice === 0) return [];
-  
+
   return ohlcvData.map((candle) => {
     // The price data from Bitquery might already be in the correct scale
     // Let's use a smaller multiplier to get realistic K-range market caps
     // Most pump.fun tokens have market caps from $1K to $100K
     const scaleFactor = 1000000; // Adjust this to get realistic market cap values
-    
+
     return {
       time: Math.floor(new Date(candle.time).getTime() / 1000) as any,
       open: candle.open * solanaPrice * scaleFactor,
@@ -344,18 +344,18 @@ export function calculateTokenStats(ohlcvData: OHLCVData[], metadata: TokenMetad
 
   const latestPriceSOL = ohlcvData[ohlcvData.length - 1]?.close || 0;
   const latestPriceUSD = latestPriceSOL * solanaPrice;
-  
+
   // Use the same scale factor for consistency
   const scaleFactor = 1000000;
   const marketCap = latestPriceUSD * scaleFactor;
-  
+
   const totalVolume = ohlcvData.reduce((sum, candle) => sum + parseFloat(candle.volume), 0);
-  
+
   // Calculate approximate stats
   const liquiditySOL = totalVolume / 1000000000; // Approximate liquidity
   const supply = 1000000000; // Standard pump.fun supply
   const globalFeesPaid = totalVolume * 0.01; // Approximate 1% fees
-  
+
   // Mock bonding curve progress (would need actual pool data)
   const bondingCurveProgress = Math.min((liquiditySOL / 85) * 100, 100);
 
@@ -400,7 +400,7 @@ export function formatMarketCap(marketCap: number): string {
   if (marketCap < 0) {
     return `-${formatMarketCap(Math.abs(marketCap))}`;
   }
-  
+
   // Different formatting based on magnitude
   if (marketCap >= 1000000000) {
     return `$${(marketCap / 1000000000).toFixed(1)}B`;
@@ -479,7 +479,7 @@ export async function getJupiterQuote(
 
     // Convert SOL amount to lamports (1 SOL = 1e9 lamports)
     const amountInLamports = Math.floor(amount * 1e9);
-    
+
     const params = new URLSearchParams({
       inputMint: SOL_MINT,
       outputMint: outputMint,
@@ -491,11 +491,11 @@ export async function getJupiterQuote(
     });
 
     const response = await fetch(`${JUPITER_API_BASE}/v6/quote?${params}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Jupiter quote failed:', response.statusText, errorText);
-      
+
       try {
         const errorData = JSON.parse(errorText);
         if (errorData.error?.includes('No route found')) {
@@ -507,19 +507,19 @@ export async function getJupiterQuote(
       } catch (parseError) {
         // If we can't parse the error, treat it as a regular failure
       }
-      
+
       return null;
     }
 
     const quote = await response.json();
     console.log('Jupiter quote response:', quote);
-    
+
     // Validate quote has required fields
     if (!quote.outAmount || !quote.inAmount) {
       console.error('Invalid quote response - missing amount fields');
       return null;
     }
-    
+
     return quote;
   } catch (error) {
     console.error('Error getting Jupiter quote:', error);
@@ -555,11 +555,11 @@ export async function getJupiterSellQuote(
     });
 
     const response = await fetch(`${JUPITER_API_BASE}/v6/quote?${params}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Jupiter sell quote failed:', response.statusText, errorText);
-      
+
       try {
         const errorData = JSON.parse(errorText);
         if (errorData.error?.includes('No route found')) {
@@ -571,19 +571,19 @@ export async function getJupiterSellQuote(
       } catch (parseError) {
         // If we can't parse the error, treat it as a regular failure
       }
-      
+
       return null;
     }
 
     const quote = await response.json();
     console.log('Jupiter sell quote response:', quote);
-    
+
     // Validate quote has required fields
     if (!quote.outAmount || !quote.inAmount) {
       console.error('Invalid sell quote response - missing amount fields');
       return null;
     }
-    
+
     return quote;
   } catch (error) {
     console.error('Error getting Jupiter sell quote:', error);
@@ -625,7 +625,7 @@ export async function buildJupiterSwapTransaction(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Jupiter swap transaction build failed:', response.status, errorText);
-      
+
       // Parse error for better handling
       try {
         const errorData = JSON.parse(errorText);
@@ -644,12 +644,12 @@ export async function buildJupiterSwapTransaction(
 
     const swapResponse = await response.json();
     console.log('Jupiter swap response:', swapResponse);
-    
+
     // Validate that we have a valid transaction
     if (!swapResponse.swapTransaction) {
       throw new Error('No transaction returned from Jupiter');
     }
-    
+
     return swapResponse;
   } catch (error) {
     console.error('Error building Jupiter swap transaction:', error);
@@ -657,4 +657,4 @@ export async function buildJupiterSwapTransaction(
   }
 }
 
- 
+
