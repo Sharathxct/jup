@@ -288,10 +288,11 @@ function EnhancedCoinCard({ token }: { token: ProcessedToken }) {
   );
 }
 
-function CoinSection({ title, coins, realTimeTokens }: { 
+function CoinSection({ title, coins, realTimeTokens, isInitialLoading }: { 
   title: string; 
   coins?: Coin[]; 
   realTimeTokens?: ProcessedToken[];
+  isInitialLoading?: boolean;
   icon?: string;
 }) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -327,9 +328,16 @@ function CoinSection({ title, coins, realTimeTokens }: {
       </div>
       <div className="space-y-px overflow-y-auto flex-1">
         {isRealTime ? (
-          displayTokens.length > 0 ? (
-            displayTokens.map((token) => (
-              <EnhancedCoinCard key={token.id} token={token} />
+          isInitialLoading ? (
+            <div className="flex items-center justify-center h-32 text-gray-400">
+              <div className="text-center">
+                <div className="animate-spin mb-2 text-2xl">⚡</div>
+                <div>Loading {title.toLowerCase()}...</div>
+              </div>
+            </div>
+          ) : displayTokens.length > 0 ? (
+            displayTokens.map((token, index) => (
+              <EnhancedCoinCard key={`${token.mintAddress}-${token.timestamp}-${index}`} token={token} />
             ))
           ) : (
             <div className="flex items-center justify-center h-32 text-gray-400">
@@ -351,7 +359,7 @@ function CoinSection({ title, coins, realTimeTokens }: {
 }
 
 export default function PulsePage() {
-  const { newTokens, finalStretchTokens, migratedTokens, isLoading, isConnected } = usePulseWebSocket();
+  const { newTokens, finalStretchTokens, migratedTokens, isLoading, isLoadingInitialData, isConnected } = usePulseWebSocket();
 
   return (
     <div className=" bg-black">
@@ -384,14 +392,17 @@ export default function PulsePage() {
           <CoinSection 
             title="New Pairs" 
             realTimeTokens={newTokens}
+            isInitialLoading={isLoadingInitialData}
           />
           <CoinSection 
             title="Final Stretch" 
             realTimeTokens={finalStretchTokens}
+            isInitialLoading={isLoadingInitialData}
           />
           <CoinSection 
             title="Migrated" 
             realTimeTokens={migratedTokens}
+            isInitialLoading={isLoadingInitialData}
           />
         </div>
       </div>

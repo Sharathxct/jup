@@ -117,6 +117,31 @@ export interface BitqueryResponse {
   };
 }
 
+// Initial data response interfaces
+export interface InitialNewTokensResponse {
+  data: {
+    Solana: {
+      TokenSupplyUpdates: TokenSupplyUpdate[];
+    };
+  };
+}
+
+export interface InitialFinalStretchResponse {
+  data: {
+    Solana: {
+      DEXPools: DEXPoolUpdate[];
+    };
+  };
+}
+
+export interface InitialMigratedTokensResponse {
+  data: {
+    Solana: {
+      TokenSupplyUpdates: TokenSupplyUpdate[];
+    };
+  };
+}
+
 export interface TokenMetadata {
   name: string;
   symbol: string;
@@ -151,6 +176,7 @@ export interface ProcessedToken {
 
 const BITQUERY_TOKEN = "ory_at_0NlxWHLGYknXfHwJ31_MmSalZWOWjW6fFQ1CbmHImIE.v6_jEdT8sIxWzGATC1PnK2uGE79okUZkdzc5L34clOM";
 const WS_URL = `wss://streaming.bitquery.io/eap?token=${BITQUERY_TOKEN}`;
+const HTTP_URL = `https://streaming.bitquery.io/eap?token=${BITQUERY_TOKEN}`;
 
 const NEW_TOKENS_SUBSCRIPTION = `
 subscription {
@@ -294,6 +320,153 @@ subscription {
       Block {
         Time
         Height
+      }
+    }
+  }
+}`;
+
+// HTTP GraphQL queries for initial data fetching
+const INITIAL_NEW_TOKENS_QUERY = `
+query GetInitialNewTokens {
+  Solana {
+    TokenSupplyUpdates(
+      limit: {count: 50}
+      orderBy: {descending: Block_Time}
+      where: {
+        Instruction: {
+          Program: {
+            Address: {is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"}
+            Method: {is: "create"}
+          }
+        }
+        Transaction: {Result: {Success: true}}
+      }
+    ) {
+      Block {
+        Time
+      }
+      Transaction {
+        Signer
+        Signature
+      }
+      TokenSupplyUpdate {
+        Amount
+        Currency {
+          Symbol
+          ProgramAddress
+          PrimarySaleHappened
+          Native
+          Name
+          MintAddress
+          MetadataAddress
+          Key
+          IsMutable
+          Fungible
+          EditionNonce
+          Decimals
+          Wrapped
+          VerifiedCollection
+          Uri
+          UpdateAuthority
+          TokenStandard
+        }
+        PostBalance
+      }
+    }
+  }
+}`;
+
+const INITIAL_FINAL_STRETCH_QUERY = `
+query GetInitialFinalStretchTokens {
+  Solana {
+    DEXPools(
+      limit: {count: 50}
+      orderBy: {descending: Block_Time}
+      where: {Pool: {Base: {PostAmount: {gt: "103450000"}}, Dex: {ProgramAddress: {is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"}}, Market: {QuoteCurrency: {MintAddress: {is: "11111111111111111111111111111111"}}}}, Transaction: {Result: {Success: true}}}
+    ) {
+      Block {
+        Time
+      }
+      Pool {
+        Market {
+          BaseCurrency {
+            MintAddress
+            Name
+            Symbol
+          }
+          MarketAddress
+          QuoteCurrency {
+            MintAddress
+            Name
+            Symbol
+          }
+        }
+        Dex {
+          ProtocolName
+          ProtocolFamily
+        }
+        Base {
+          PostAmount
+        }
+        Quote {
+          PostAmount
+          PriceInUSD
+          PostAmountInUSD
+        }
+      }
+    }
+  }
+}`;
+
+const INITIAL_MIGRATED_TOKENS_QUERY = `
+query GetInitialMigratedTokens {
+  Solana {
+    TokenSupplyUpdates(
+      limit: {count: 50}
+      orderBy: {descending: Block_Time}
+      where: {
+        TokenSupplyUpdate: {
+          Currency: {
+            UpdateAuthority: {is: "TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM"}
+          }
+        }
+        Instruction: {
+          Program: {
+            Method: {in: ["migrate", "withdrawFees"]}
+          }
+        }
+      }
+      limitBy: {by: TokenSupplyUpdate_Currency_MintAddress, count: 1}
+    ) {
+      Block {
+        Time
+      }
+      Transaction {
+        Signature
+        Signer
+      }
+      TokenSupplyUpdate {
+        Amount
+        Currency {
+          Decimals
+          EditionNonce
+          Fungible
+          IsMutable
+          Key
+          MetadataAddress
+          MintAddress
+          Name
+          Native
+          PrimarySaleHappened
+          ProgramAddress
+          Symbol
+          TokenStandard
+          UpdateAuthority
+          Uri
+          VerifiedCollection
+          Wrapped
+        }
+        PostBalance
       }
     }
   }
@@ -558,6 +731,42 @@ export function processMigratedData(instruction: MigratedTokenUpdate): Processed
   };
 }
 
+// Process initial migrated token data (simplified TokenSupplyUpdates structure)
+export function processInitialMigratedData(tokenUpdate: TokenSupplyUpdate): ProcessedToken | null {
+  const currency = tokenUpdate.TokenSupplyUpdate.Currency;
+  const timestamp = tokenUpdate.Block.Time;
+  const timeAgo = getTimeAgo(timestamp);
+
+  // Only process pump tokens (mint address ends with "pump")
+  if (!currency.MintAddress.endsWith('pump')) {
+    return null;
+  }
+
+  // Calculate migration indicator from the negative amount (tokens being withdrawn)
+  const withdrawnAmount = Math.abs(parseFloat(tokenUpdate.TokenSupplyUpdate.Amount));
+  const isFullMigration = withdrawnAmount >= 206900000; // Full bonding curve completion
+
+  return {
+    id: currency.MintAddress,
+    name: currency.Name || currency.Symbol,
+    symbol: currency.Symbol,
+    icon: '🚀', // Rocket icon for migrated tokens
+    price: 'Migrated',
+    change: `${(withdrawnAmount / 1000000).toFixed(1)}M withdrawn`,
+    changePercent: isFullMigration ? 100 : Math.floor((withdrawnAmount / 206900000) * 100),
+    marketCap: 'Graduated',
+    volume: 'v',
+    age: timeAgo,
+    holders: Math.floor(Math.random() * 10000) + 5000,
+    txns: Math.floor(Math.random() * 2000) + 500,
+    chart: 'trending_up',
+    tags: ['Migrated', 'Graduated', isFullMigration ? 'Full' : 'Partial'],
+    mintAddress: currency.MintAddress,
+    uri: currency.Uri, // Include URI for metadata
+    timestamp,
+  };
+}
+
 function getTimeAgo(timestamp: string): string {
   const now = new Date();
   const time = new Date(timestamp);
@@ -573,5 +782,70 @@ function getTimeAgo(timestamp: string): string {
     return `${diffMinutes}m`;
   } else {
     return `${diffHours}h`;
+  }
+}
+
+// HTTP query functions for initial data fetching
+async function queryBitquery(query: string): Promise<any> {
+  try {
+    const response = await fetch(HTTP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (result.errors) {
+      console.error('GraphQL errors:', result.errors);
+      throw new Error(result.errors[0]?.message || 'GraphQL query failed');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error querying Bitquery:', error);
+    throw error;
+  }
+}
+
+export async function fetchInitialNewTokens(): Promise<ProcessedToken[]> {
+  try {
+    const response: InitialNewTokensResponse = await queryBitquery(INITIAL_NEW_TOKENS_QUERY);
+    return response.data.Solana.TokenSupplyUpdates.map(processTokenData);
+  } catch (error) {
+    console.error('Error fetching initial new tokens:', error);
+    return [];
+  }
+}
+
+export async function fetchInitialFinalStretchTokens(): Promise<ProcessedToken[]> {
+  try {
+    const response: InitialFinalStretchResponse = await queryBitquery(INITIAL_FINAL_STRETCH_QUERY);
+    const tokens = response.data.Solana.DEXPools
+      .map(processFinalStretchData)
+      .filter((token): token is ProcessedToken => token !== null);
+    return tokens;
+  } catch (error) {
+    console.error('Error fetching initial final stretch tokens:', error);
+    return [];
+  }
+}
+
+export async function fetchInitialMigratedTokens(): Promise<ProcessedToken[]> {
+  try {
+    const response: InitialMigratedTokensResponse = await queryBitquery(INITIAL_MIGRATED_TOKENS_QUERY);
+    const tokens = response.data.Solana.TokenSupplyUpdates
+      .map(processInitialMigratedData)
+      .filter((token): token is ProcessedToken => token !== null);
+    return tokens;
+  } catch (error) {
+    console.error('Error fetching initial migrated tokens:', error);
+    return [];
   }
 }

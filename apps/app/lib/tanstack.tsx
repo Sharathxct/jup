@@ -12,7 +12,7 @@ const queryClient = new QueryClient({
         refetchOnReconnect: true,
         retry: false,
         staleTime: OneHoureInMs,
-        gcTime: Infinity,
+        gcTime: 2 * OneHoureInMs, // Keep data in memory for 2 hours
       },
     },
   }
